@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<title>Go WASM Audio Player</title>
+	<script src="wasm_exec.js"></script>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
+	<style>
+		:root {
+			--rosePineDawn-base: #faf4ed;
+			--rosePineDawn-surface: #fffaf3;
+			--rosePineDawn-overlay: #f2e9e1;
+			--rosePineDawn-muted: #9893a5;
+			--rosePineDawn-subtle: #797593;
+			--rosePineDawn-text: #575279;
+			--rosePineDawn-love: #b4637a;
+			--rosePineDawn-gold: #ea9d34;
+			--rosePineDawn-rose: #d7827e;
+			--rosePineDawn-pine: #286983;
+			--rosePineDawn-foam: #56949f;
+			--rosePineDawn-iris: #907aa9;
+			--rosePineDawn-highlightLow: #f4ede8;
+			--rosePineDawn-highlightMed: #dfdad9;
+			--rosePineDawn-highlightHigh: #cecacd;
+
+
+			--main-background: var(--rosePineDawn-base);
+			--container: var(--rosePineDawn-overlay);
+			--primary: var(--rosePineDawn-love);
+			--secondary: var(--rosePineDawn-gold);
+			--border: var(--rosePineDawn-muted);
+			--text: var(--rosePineDawn-text);
+			--gradient-start: var(--rosePineDawn-pine);
+			--gradient-end: var(--rosePineDawn-iris);
+			--accent: var(--rosePineDawn-rose);
+			--hover: var(--rosePineDawn-gold);
+		}
+
+		@media (prefers-color-scheme: dark) {
+			:root {
+				--rosePineMoon-base: #232136;
+				--rosePineMoon-surface: #2a273f;
+				--rosePineMoon-overlay: #393552;
+				--rosePineMoon-muted: #6e6a86;
+				--rosePineMoon-subtle: #908caa;
+				--rosePineMoon-text: #e0def4;
+				--rosePineMoon-love: #eb6f92;
+				--rosePineMoon-gold: #f6c177;
+				--rosePineMoon-rose: #ea9a97;
+				--rosePineMoon-pine: #3e8fb0;
+				--rosePineMoon-foam: #9ccfd8;
+				--rosePineMoon-iris: #c4a7e7;
+				--rosePineMoon-highlightLow: #2a283e;
+				--rosePineMoon-highlightMed: #44415a;
+				--rosePineMoon-highlightHigh: #56526e;
+
+				--main-background: var(--rosePineMoon-base);
+				--container: var(--rosePineMoon-overlay);
+				--primary: var(--rosePineMoon-iris);
+				--secondary: var(--rosePineMoon-rose);
+				--accent: var(--rosePineMoon-gold);
+				--border: var(--rosePineMoon-highlightLow);
+				--text: var(--rosePineMoon-highlightMed);
+				--gradient-start: var(--rosePineMoon-rose);
+				--gradient-end: var(--rosePineMoon-iris);
+				--hover: var(--rosePineMoon-highlightMed);
+				--play: var(--rosePineMoon-foam);
+				--pause: var(--rosePineDawn-love);
+			}
+		}
+
+		body {
+			font-family: 'Press Start 2P', 'Courier New', Courier, monospace;
+			background: var(--main-background);
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			height: 100vh;
+			margin: 0;
+			transition: background 0.3s, color 0.3s;
+		}
+
+		.container {
+			background: var(--container);
+			padding: 20px;
+			border-radius: 10px;
+			box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+			text-align: center;
+			transition: background 0.3s;
+		}
+
+		h1 {
+			color: var(--primary);
+			font-size: 24px;
+			text-transform: uppercase;
+			margin-bottom: 5px;
+		}
+
+		p {
+			color: var(--secondary);
+			font-size: 16px;
+			margin-top: 0;
+		}
+
+		.progress-container {
+			background: var(--border);
+			border: 1px solid var(--border);
+			height: 20px;
+			width: 100%;
+			border-radius: 5px;
+			margin: 20px 0;
+		}
+
+		.progress-bar {
+			background: linear-gradient(90deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
+			height: 100%;
+			width: 0%;
+			border-radius: 5px;
+			transition: width 0.3s ease-in-out;
+		}
+
+		.file-upload {
+			position: relative;
+			display: inline-block;
+		}
+
+		.file-upload input[type='file'] {
+			font-size: 1px;
+			position: absolute;
+			top: 0;
+			right: 0;
+			opacity: 0;
+		}
+
+		.file-upload-button {
+			font-family: 'Press Start 2P', 'Courier New', Courier, monospace;
+			background-color: var(--primary);
+			border: 2px solid var(--border);
+			color: var(--text);
+			padding: 10px 20px;
+			text-align: center;
+			display: inline-block;
+			font-size: 16px;
+			margin: 4px 2px;
+			cursor: pointer;
+			border-radius: 5px;
+			width: 375px;
+			transition: all 0.3s;
+			overflow: hidden;
+			white-space: nowrap;
+			text-overflow: ellipsis;
+		}
+
+		.file-upload-button:hover {
+			background-color: var(--text);
+			color: var(--accent);
+			box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+		}
+
+		.playpause label {
+			display: block;
+			box-sizing: border-box;
+			width: 0;
+			height: 74px;
+			border-color: transparent transparent transparent transparent;
+			border-left-color: var(--play);
+			transition: 100ms all ease;
+			cursor: pointer;
+			border-width: 37px 0 37px 60px;
+			border-style: solid;
+			font-family: 'Press Start 2P', 'Courier New', Courier, monospace;
+			display: inline-block;
+			margin: 4px 2px;
+			border-radius: 5px;
+		}
+
+		.playpause input[type=checkbox] {
+			position: absolute;
+			left: -9999px;
+		}
+
+		.playpause input[type=checkbox]:checked+label {
+			border-style: double;
+			border-width: 0px 0 0px 60px;
+			border-left-color: var(--pause);
+		}
+
+		.playpause input[type=checkbox]:hover+label {
+			border-left-color: var(--accent);
+		}
+
+		.playpause input[type=checkbox]:checked:hover+label {
+			border-left-color: var(--accent);
+		}
+
+		.github-link {
+			position: fixed;
+			/* Fixed positioning relative to the viewport */
+			right: 20px;
+			/* 20 pixels from the right edge of the viewport */
+			bottom: 20px;
+			/* 20 pixels from the bottom edge of the viewport */
+			z-index: 1000;
+			/* High z-index to ensure it stays on top of other content */
+		}
+
+		.github-link img {
+			width: 40px;
+			/* Set the size of the SVG */
+			height: auto;
+			/* Maintain aspect ratio */
+			transition: transform 0.3s ease;
+			/* Smooth transition for hover effect */
+		}
+
+		.github-link:hover img {
+			transform: scale(1.5);
+			/* Slightly enlarge the icon on hover */
+		}
+	</style>
+</head>
+
+<body>
+	<!--https://stackoverflow.com/questions/21147149/flash-of-unstyled-content-fouc-in-firefox-only-is-ff-slow-renderer-->
+	<script>0</script>
+
+	<div class="container">
+		<h1>Wavvy</h1>
+		<p>🎵🎵 Play a WAV File 🎵🎵</p>
+		<div class="file-upload">
+			<button class="file-upload-button" onclick="document.getElementById('wavFile').click();">Choose
+				File</button>
+			<input type="file" id="wavFile" accept=".wav" onchange="fileNameDisplay(); loadWavFile()">
+		</div>
+		<div class="progress-container">
+			<div class="progress-bar" id="progressBar"></div>
+		</div>
+		<div class="playpause">
+			<input type="checkbox" value="None" id="playpause" name="check" onclick="togglePlayPause()" />
+			<label for="playpause" tabindex=1></label>
+		</div>
+	</div>
+	<div class="github-link">
+		<a href="https://github.com/braheezy/wavvy" target="_blank" title="View Source on GitHub">
+			<img src="https://raw.githubusercontent.com/hackernoon/pixel-icon-library/main/Icons/SVG/brands/github.svg"
+				alt="GitHub Link" />
+		</a>
+	</div>
+
+	<script>
+		hljs.configure({ tabReplace: '  ' });
+		const go = new Go();
+		let mod, inst;
+		let audioDuration = 0;
+		let audioStartTime = 0;
+		let audioPauseTime = 0;
+		let started = false;
+		let isPlaying = false
+		let loaded = false
+		let progressInterval = null
+
+		// Go code background
+		fetch('main.go').then(res => res.text()).then(res => {
+			let codeEl = document.getElementById("code")
+			codeEl.innerHTML = res.replace(/&/g, "&amp;")
+				.replace(/>/g, "&gt;")
+				.replace(/</g, "&lt;")
+			hljs.highlightBlock(codeEl)
+		})
+
+		async function loadWasm() {
+			const wasm = await WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject);
+			mod = wasm.module;
+			inst = wasm.instance;
+			go.run(inst);
+		}
+
+		window.onload = loadWasm;
+
+		function togglePlayPause() {
+			if (loaded) {
+				if (!isPlaying) {
+					playWav()
+					audioStartTime = new Date().getTime() - (audioPauseTime - audioStartTime)
+					updateProgressBar()
+					isPlaying = true
+				} else {
+					pauseWav()
+					audioPauseTime = new Date().getTime()
+					isPlaying = false
+				}
+			}
+			const playpause = document.getElementById("playpause");
+			playpause.checked = isPlaying;
+		}
+
+		function loadWavFile() {
+			const file = document.getElementById('wavFile').files[0];
+			if (file) {
+				if (file.type !== 'audio/x-wav') {
+					alert('Please select a WAV file.');
+					return false;
+				}
+				const reader = new FileReader();
+				reader.onload = function (event) {
+					const data = new Uint8Array(event.target.result);
+					window.loadWav(data)
+					loaded = true
+				};
+				reader.readAsArrayBuffer(file);
+			}
+		}
+
+
+
+		function fileNameDisplay() {
+			const fileInput = document.getElementById('wavFile');
+			const button = document.querySelector('.file-upload-button');
+			if (fileInput.files.length > 0) {
+				const fileName = fileInput.files[0].name;
+				button.textContent = fileName; // Display the file name on the button
+			}
+		}
+
+		function updateProgressBar() {
+			const progressBar = document.getElementById('progressBar');
+			if (progressInterval !== null) {
+				clearInterval(progressInterval);  // Clear existing interval when starting a new one
+			}
+			progressInterval = setInterval(function () {
+				if (isPlaying) {
+					const currentTime = new Date().getTime();
+					const elapsedTime = currentTime - audioStartTime;
+					const progressPercent = Math.min((elapsedTime / audioDuration) * 100, 100);
+					progressBar.style.width = progressPercent + '%';
+					if (progressPercent >= 100) {
+						clearInterval(progressInterval);
+					}
+				} else {
+					clearInterval(progressInterval);  // Stop updating the progress bar when audio is paused
+				}
+			}, 100);
+		}
+
+		// Needs to be called by Go when it knows the duration
+		function setAudioDuration(duration) {
+			audioDuration = duration;
+		}
+	</script>
+</body>
+
+</html>
