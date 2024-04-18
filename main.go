@@ -21,6 +21,7 @@ func main() {
 	js.Global().Set("loadWav", js.FuncOf(loadWav))
 	js.Global().Set("playWav", js.FuncOf(playWav))
 	js.Global().Set("pauseWav", js.FuncOf(pauseWav))
+
 	// Block forever, to keep Go runtime alive.
 	select {}
 }
@@ -33,18 +34,22 @@ func loadWav(this js.Value, args []js.Value) interface{} {
 		ChannelCount: 2,
 		Format:       oto.FormatSignedInt16LE,
 	}
+
 	// Create the Oto context.
 	otoCtx, ready, err := oto.NewContext(op)
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
 	}
+
 	// Wait for the context to be ready. Must be in a goroutine or things deadlock.
 	go func() {
 		<-ready
 	}()
+
 	// Read WAV data from js.
 	data := make([]byte, args[0].Get("byteLength").Int())
 	js.CopyBytesToGo(data, args[0])
+
 	// Decode the WAV data.
 	r := bytes.NewReader(data)
 	decoder := wav.NewDecoder(r)
@@ -55,14 +60,17 @@ func loadWav(this js.Value, args []js.Value) interface{} {
 	if err != nil {
 		return map[string]interface{}{"error": "failed to read WAV buffer: " + err.Error()}
 	}
+
 	// Convert to bytes.
 	byteData := make([]byte, len(buf.Data)*2)
 	for i, sample := range buf.Data {
 		binary.LittleEndian.PutUint16(byteData[i*2:], uint16(sample))
 	}
+
 	// Once we can figure out the duration of the audio, we can tell the UI about it.
 	durationMs := float64(len(buf.Data)) / float64(decoder.Format().SampleRate) * 1000 / float64(decoder.Format().NumChannels)
 	js.Global().Call("setAudioDuration", durationMs)
+
 	// Finally, load the data into the player.
 	player = otoCtx.NewPlayer(bytes.NewReader(byteData))
 
