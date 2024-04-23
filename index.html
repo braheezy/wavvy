@@ -311,8 +311,6 @@
 			go.run(inst);
 		}
 
-		window.onload = loadWasm;
-
 		function togglePlayPause() {
 			if (loaded) {
 				if (!isPlaying) {
@@ -337,17 +335,17 @@
 					alert('Please select a WAV file.');
 					return false;
 				}
+
 				const reader = new FileReader();
 				reader.onload = function (event) {
 					const data = new Uint8Array(event.target.result);
-					window.loadWav(data)
+					console.log(window.loadWav(data))
 					loaded = true
+					resetProgressBar();
 				};
 				reader.readAsArrayBuffer(file);
 			}
 		}
-
-
 
 		function fileNameDisplay() {
 			const fileInput = document.getElementById('wavFile');
@@ -356,6 +354,17 @@
 				const fileName = fileInput.files[0].name;
 				button.textContent = fileName; // Display the file name on the button
 			}
+		}
+
+		function resetProgressBar() {
+			const progressBar = document.getElementById('progressBar');
+			if (progressInterval !== null) {
+				clearInterval(progressInterval);  // Clear existing interval
+				progressInterval = null;
+			}
+			progressBar.style.width = '0%';  // Reset progress bar width
+			audioStartTime = 0;  // Reset the start time for new playback
+			audioPauseTime = 0;  // Reset any pause time
 		}
 
 		function updateProgressBar() {
@@ -382,6 +391,29 @@
 		function setAudioDuration(duration) {
 			audioDuration = duration;
 		}
+
+		async function preloadWavFile() {
+			const url = '/assets/chiptune-funk.wav';
+
+			//const url = 'four_tet_baby.wav';
+			try {
+				const response = await fetch(url);
+				const arrayBuffer = await response.arrayBuffer();
+				const data = new Uint8Array(arrayBuffer);
+				console.log("preloadWavFile", window.loadWav(data))
+				loaded = true
+				console.log("Audio preloaded successfully.");
+				document.querySelector('.file-upload-button').textContent = "chiptune-funk.wav";
+			} catch (error) {
+				console.error('Error preloading WAV file:', error);
+			}
+		}
+
+		window.onload = async function () {
+			await loadWasm();
+			await preloadWavFile();
+		};
+
 	</script>
 </body>
 

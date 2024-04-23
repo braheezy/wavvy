@@ -14,6 +14,8 @@ import (
 var (
 	// The global player. Should it be global? ¯\_(ツ)_/¯
 	player *oto.Player
+	// The audio context. There can be only one.
+	otoCtx *oto.Context
 )
 
 func main() {
@@ -21,31 +23,15 @@ func main() {
 	js.Global().Set("loadWav", js.FuncOf(loadWav))
 	js.Global().Set("playWav", js.FuncOf(playWav))
 	js.Global().Set("pauseWav", js.FuncOf(pauseWav))
-
 	// Block forever, to keep Go runtime alive.
 	select {}
 }
 
 // loadWav loads a WAV file into memory.
 func loadWav(this js.Value, args []js.Value) interface{} {
-	// Create the Oto options with sane defaults.
-	op := &oto.NewContextOptions{
-		SampleRate:   44100,
-		ChannelCount: 2,
-		Format:       oto.FormatSignedInt16LE,
+	if player != nil {
+		player.Close()
 	}
-
-	// Create the Oto context.
-	otoCtx, ready, err := oto.NewContext(op)
-	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
-	}
-
-	// Wait for the context to be ready. Must be in a goroutine or things deadlock.
-	go func() {
-		<-ready
-	}()
-
 	// Read WAV data from js.
 	data := make([]byte, args[0].Get("byteLength").Int())
 	js.CopyBytesToGo(data, args[0])
@@ -61,6 +47,12 @@ func loadWav(this js.Value, args []js.Value) interface{} {
 		return map[string]interface{}{"error": "failed to read WAV buffer: " + err.Error()}
 	}
 
+	// Load the audio context.
+	err = loadContext(decoder)
+	if err != nil {
+		return map[string]interface{}{"error": "failed to load context: " + err.Error()}
+	}
+
 	// Convert to bytes.
 	byteData := make([]byte, len(buf.Data)*2)
 	for i, sample := range buf.Data {
@@ -74,6 +66,33 @@ func loadWav(this js.Value, args []js.Value) interface{} {
 	// Finally, load the data into the player.
 	player = otoCtx.NewPlayer(bytes.NewReader(byteData))
 
+	return map[string]interface{}{"msg": "loading new player"}
+}
+
+// loadContext loads the audio context.
+func loadContext(decoder *wav.Decoder) error {
+	if otoCtx != nil {
+		return nil
+	}
+	// Create the Oto options
+	op := &oto.NewContextOptions{
+		SampleRate:   decoder.Format().SampleRate,
+		ChannelCount: decoder.Format().NumChannels,
+		Format:       oto.FormatSignedInt16LE,
+	}
+
+	// Create the Oto context.
+	var err error
+	var ready chan struct{}
+	otoCtx, ready, err = oto.NewContext(op)
+	if err != nil {
+		return err
+	}
+
+	// Wait for the context to be ready. Must be in a goroutine or things deadlock.
+	go func() {
+		<-ready
+	}()
 	return nil
 }
 
